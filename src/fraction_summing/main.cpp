@@ -61,8 +61,18 @@ static void test5()
 static void test_array_functions(int n)
 {
     //TODO: implement function
-
+    fraction* fracArray = (fraction*)malloc(n*sizeof(fraction));
+    fill_fraction_array(fracArray, n);
+    print_fraction_array(fracArray, n);
+    printf("sum fraction array: %d/%d \n", 
+        sum_fraction_array(fracArray, n).num, sum_fraction_array(fracArray, n).denom);
+    printf("sum fraction array approx: %f\n", sum_fraction_array_approx(fracArray, n));
     //TODO: find n for which sum function breaks. Explain what is happening.
+    /*
+    Thogh telescoping sum, the last iteration of sum_function_array is (1-1/n) + (1/n - 1/n+1)
+    One of the step is caculate the value of n*(n+1), if the value is overflow, the result will be wrong
+    The edge value n is 
+    */
 }
 
 static void test_toolbox(int argc, char* argv[])

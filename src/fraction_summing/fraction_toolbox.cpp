@@ -70,19 +70,21 @@ void reduce_fraction_inplace(fraction & frac)
     frac.num /= gcd_val;
     frac.denom /= gcd_val;
     //TODO: add short comment to explain which of the gcd() functions your code is calling
-    //Use iterative Euclid’s algorithm, gcd() from line 54 - 64
-    //Above functions are overload in C++
-    //Since the entire fraction structure is passed, the iterative gcd() is the one being used
+    /*
+     Use iterative Euclid’s algorithm, gcd() from line 54 - 64
+     Above functions are overload in C++
+     Since the entire fraction structure is passed, the iterative gcd() is the one being used
+    */
 }
 
 fraction add_fractions(fraction frac1, fraction frac2)
 {
     //TODO: implement function 8
     fraction add_frac;
-    add_frac.num = frac1.num + frac2.num;
-    add_frac.denom = frac1.denom + frac2.denom;
+    add_frac.num = frac1.num * frac2.denom + frac2.num * frac1.denom;
+    add_frac.denom = frac1.denom * frac2.denom;
     reduce_fraction_inplace(add_frac);
-
+    return add_frac;
 }
 
 double sum_fraction_array_approx(fraction frac_array[], int n)
@@ -101,12 +103,12 @@ double sum_fraction_array_approx(fraction frac_array[], int n)
 
 //TODO: implement function 10
 fraction sum_fraction_array(fraction frac_array[], int n){
-    fraction sum = {0,1};
+    fraction sumFrac = {0,1};
     for (int i = 0; i < n; i++)
     {
-        sum = add_fractions(sum, frac_array[i]);
+        sumFrac = add_fractions(sumFrac, frac_array[i]);
     }
-    return sum;
+    return sumFrac;
 };
 
 void fill_fraction_array(fraction frac_array[], int n)
