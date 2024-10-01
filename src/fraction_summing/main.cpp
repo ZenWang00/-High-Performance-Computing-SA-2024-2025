@@ -71,9 +71,15 @@ static void test_array_functions(int n)
     /*
     Thogh telescoping sum, the last iteration of sum_function_array is (1-1/n) + (1/n - 1/n+1)
     One of the step is caculate the value of n*(n+1), if the value is overflow, the result will be wrong
-    The edge value n is 
+    The edge value n is the integer part of (2^15.5 - 1), which is 46339
+
+    Each step of function sum_fraction_array_approx the calculation involves division
+    the result gradually approaches 0 and the sum approaches 1
+    That will not exceed the range
     */
 }
+
+
 
 static void test_toolbox(int argc, char* argv[])
 {
@@ -91,5 +97,6 @@ static void test_toolbox(int argc, char* argv[])
 int main(int argc, char* argv[])
 {
     test_toolbox(argc, argv);
+    free(fracArray);
     return 0;
 }
