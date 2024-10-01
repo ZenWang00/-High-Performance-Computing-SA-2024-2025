@@ -27,11 +27,35 @@ static void readcmdline(fraction & frac, int argc, char* argv[])
 static void test23467(int argc, char* argv[])
 {
     //TODO: implement function
+    fraction frac;                
+    readcmdline(frac, argc, argv);
+
+    printf("test 2:\n");
+    printf("orgin fraction: %d/%d; square fraction: %d/%d \n",
+        frac.num, frac.denom, square_fraction(frac).num, square_fraction(frac).denom );
+
+    printf("test 4:\n");
+    printf("double value of fraction: %f\n", fraction2double(frac));
+
+    printf("test 6:\n");
+    printf("greatest common divisor: %d\n", gcd(frac));
+    
+    printf("test 7:\n");
+    reduce_fraction_inplace(frac);
+    printf("reduce fraction: %d/%d\n", frac.num, frac.denom);
+
+    printf("test 3:\n");
+    square_fraction_inplace(frac);
+    printf("square fraction: %d/%d \n", frac.num, frac.denom );
 }
 
 static void test5()
 {
     //TODO: implement function
+    int inputInt1, inputInt2;
+    printf("please input two integers to find out greatest common divisor:\n");
+    scanf("%d %d", &inputInt1, &inputInt2);
+    printf("%d \n", gcd(inputInt1,inputInt2));
 }
 
 static void test_array_functions(int n)
@@ -56,5 +80,6 @@ static void test_toolbox(int argc, char* argv[])
 
 int main(int argc, char* argv[])
 {
-    
+    test_toolbox(argc, argv);
+    return 0;
 }
