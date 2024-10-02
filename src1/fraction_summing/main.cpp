@@ -67,6 +67,7 @@ static void test_array_functions(int n)
     printf("sum fraction array: %d/%d \n", 
         sum_fraction_array(fracArray, n).num, sum_fraction_array(fracArray, n).denom);
     printf("sum fraction array approx: %f\n", sum_fraction_array_approx(fracArray, n));
+    free(fracArray);
     //TODO: find n for which sum function breaks. Explain what is happening.
     /*
     Thogh telescoping sum, the last iteration of sum_function_array is (1-1/n) + (1/n - 1/n+1)
@@ -97,6 +98,5 @@ static void test_toolbox(int argc, char* argv[])
 int main(int argc, char* argv[])
 {
     test_toolbox(argc, argv);
-    free(fracArray);
     return 0;
 }
