@@ -6,6 +6,8 @@
 #SBATCH --ntasks=2                    # Number of tasks
 #SBATCH --cpus-per-task=1             # Number of CPUs per task
 #SBATCH --time=00:01:00               # Wall clock time limit
+#SBATCH --partition=slim 
+#SBATCH --nodelist=icsnode26,icsnode27
 
 # load some modules & list loaded modules
 module load gcc

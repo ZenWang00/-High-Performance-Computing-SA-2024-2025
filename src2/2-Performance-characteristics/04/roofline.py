@@ -20,10 +20,8 @@ def plot_roofline(Pmax, bmax, Imin, Imax, N=1000, ax=None, **plt_kwargs):
 
 if __name__ == "__main__":
     fig, ax = plt.subplots()
-    ax = plot_roofline(Pmax=41.6, bmax=18, Imin=1.e-2, Imax=1.e+3, ax=ax,
-                       label="EPYC 7H12 core")
-    ax = plot_roofline(Pmax=39.2, bmax=25, Imin=1.e-2, Imax=1.e+3, ax=ax,
-                       label="EPYC 7763 core")
+    ax = plot_roofline(Pmax=42, bmax=12, Imin=1.e-2, Imax=1.e+3, ax=ax,
+                       label="Intel(R) Xeon(R) CPU E5-2650 v3 @ 2.30GHz")
     ax.legend()
     plt.savefig("roofline.pdf")
     plt.show()
