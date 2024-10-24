@@ -4,6 +4,22 @@
 #include "consts.h"
 #include "pngwriter.h"
 #include "walltime.h"
+void print_benchmark(const char* version, double time, long nTotalIterationsCount) {
+    printf("\n%s version:\n", version);
+    printf("Total time:                 %g seconds\n", time);
+    printf("Image size:                 %ld x %ld = %ld Pixels\n",
+           (long)IMAGE_WIDTH, (long)IMAGE_HEIGHT,
+           (long)(IMAGE_WIDTH * IMAGE_HEIGHT));
+    printf("Total number of iterations: %ld\n", nTotalIterationsCount);
+    printf("Avg. time per pixel:        %g seconds\n",
+           time / (double)(IMAGE_WIDTH * IMAGE_HEIGHT));
+    printf("Avg. time per iteration:    %g seconds\n",
+           time / (double)nTotalIterationsCount);
+    printf("Iterations/second:          %g\n",
+           nTotalIterationsCount / time);
+    printf("MFlop/s:                    %g\n",
+           nTotalIterationsCount * 8.0 / time * 1.e-6);
+}
 
 int main(int argc, char **argv) {
   png_data *pPng = png_create(IMAGE_WIDTH, IMAGE_HEIGHT);
@@ -33,7 +49,14 @@ int main(int argc, char **argv) {
       int n = 0;
       // TODO
       // >>>>>>>> CODE IS MISSING
-
+      while ((x2 + y2 <= 4.0) && (n < MAX_ITERS)) {
+       y = 2 * x * y + cy;
+       x = x2 - y2 + cx;
+       x2 = x * x;
+       y2 = y * y;
+       n++;
+       nTotalIterationsCount++;
+       }
       // <<<<<<<< CODE IS MISSING
       // n indicates if the point belongs to the mandelbrot set
       // plot the number of iterations at point (i, j)
@@ -43,24 +66,45 @@ int main(int argc, char **argv) {
     }
     cy += fDeltaY;
   }
-  double time_end = walltime();
 
-  // print benchmark data
-  printf("Total time:                 %g seconds\n",
-         (time_end - time_start));
-  printf("Image size:                 %ld x %ld = %ld Pixels\n",
-         (long)IMAGE_WIDTH, (long)IMAGE_HEIGHT,
-         (long)(IMAGE_WIDTH * IMAGE_HEIGHT));
-  printf("Total number of iterations: %ld\n", nTotalIterationsCount);
-  printf("Avg. time per pixel:        %g seconds\n",
-         (time_end - time_start) / (double)(IMAGE_WIDTH * IMAGE_HEIGHT));
-  printf("Avg. time per iteration:    %g seconds\n",
-         (time_end - time_start) / (double)nTotalIterationsCount);
-  printf("Iterations/second:          %g\n",
-         nTotalIterationsCount / (time_end - time_start));
-  // assume there are 8 floating point operations per iteration
-  printf("MFlop/s:                    %g\n",
-         nTotalIterationsCount * 8.0 / (time_end - time_start) * 1.e-6);
+  double time_end = walltime();
+  double serial_time = time_end - time_start;
+
+  print_benchmark("Serial", serial_time, nTotalIterationsCount);
+
+  #pragma omp parallel for private(x, y, x2, y2, cx, cy) reduction(+:nTotalIterationsCount)
+    for (long j = 0; j < IMAGE_HEIGHT; j++) {
+        cy = MIN_Y + j * fDeltaY;
+        for (long i = 0; i < IMAGE_WIDTH; i++) {
+            cx = MIN_X + i * fDeltaX;
+            x = cx;
+            y = cy;
+            x2 = x * x;
+            y2 = y * y;
+            int n = 0;
+            while ((x2 + y2 <= 4.0) && (n < MAX_ITERS)) {
+                y = 2 * x * y + cy;
+                x = x2 - y2 + cx;
+                x2 = x * x;
+                y2 = y * y;
+                n++;
+                nTotalIterationsCount++;
+            }
+
+            int c = ((long)n * 255) / MAX_ITERS;
+            #pragma omp critical
+            png_plot(pPng, i, j, c, c, c);
+        }
+    }
+
+    time_end = walltime();
+    double parallel_time = time_end - time_start;
+
+    print_benchmark("Parallel", parallel_time, nTotalIterationsCount);
+
+    double speedup = serial_time / parallel_time;
+    printf("\nSpeedup: %g\n", speedup);
+
 
   png_write(pPng, "mandel.png");
   return 0;

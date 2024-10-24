@@ -18,6 +18,8 @@ int main(int argc, char *argv[]) {
 
   double time_start = walltime();
   // TODO: YOU NEED TO PARALLELIZE THIS LOOP
+  
+  #pragma omp parallel for firstprivate(Sn) lastprivate(Sn)
   for (n = 0; n <= N; ++n) {
     opt[n] = Sn;
     Sn *= up;
@@ -27,11 +29,15 @@ int main(int argc, char *argv[]) {
   printf("Final Result Sn   :  %.17g \n", Sn);
 
   double temp = 0.0;
+  #pragma omp parallel for reduction(+:temp)
   for (n = 0; n <= N; ++n) {
     temp += opt[n] * opt[n];
   }
+
   printf("Result ||opt||^2_2 :  %f\n", temp / (double)N);
   printf("\n");
+
+  free(opt);
 
   return 0;
 }

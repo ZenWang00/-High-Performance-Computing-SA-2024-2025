@@ -35,8 +35,16 @@ int main() {
 
   // TODO Parallelize the histogram computation
   time_start = walltime();
-  for (long i = 0; i < VEC_SIZE; ++i) {
-    dist[vec[i]]++;
+  long local_histograms[BINS * omp_get_max_threads()] = {0};
+  #pragma omp parallel shared(local_histograms)
+  {
+    int tid = omp_get_thread_num();
+    long* local_hist = &local_histograms[tid * BINS];
+
+    #pragma omp for
+    for (long i = 0; i < VEC_SIZE; ++i) {
+      dist[vec[i]]++;
+    }
   }
   time_end = walltime();
 

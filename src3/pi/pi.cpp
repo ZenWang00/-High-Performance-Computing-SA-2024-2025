@@ -9,9 +9,14 @@ int main(int argc, char *argv[]) {
   double pi =0;
   double time=0;
 
-
+  
   /* TODO Serial Version of Computing Pi*/
   time = omp_get_wtime();
+  sum = 0.0;
+  for (long int i = 0; i < N; i++) {
+        double x = (i + 0.5) * dx;
+        sum += 4.0 / (1.0 + x * x);
+  }
   // TODO Fill this gap
   pi = sum * dx;
   time = omp_get_wtime() - time;
@@ -21,6 +26,11 @@ int main(int argc, char *argv[]) {
   /* TODO Parallel Version of Computing Pi*/
   time = omp_get_wtime();
   sum = 0.;
+  #pragma omp parallel for reduction(+:sum)
+    for (long int i = 0; i < N; i++) {
+        double x = (i + 0.5) * dx;
+        sum += 4.0 / (1.0 + x * x);
+  }
   // TODO Fill this gap
   pi = sum*dx;
   time = omp_get_wtime() - time;
