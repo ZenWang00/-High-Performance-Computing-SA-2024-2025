@@ -3,7 +3,7 @@
 
 #ifndef LINALG_H
 #define LINALG_H
-
+#include <omp.h>
 #include "data.h"
 
 namespace linalg {

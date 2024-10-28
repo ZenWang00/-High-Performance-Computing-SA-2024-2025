@@ -34,17 +34,23 @@ void diffusion(data::Field const& s_old, data::Field const& s_new,
     int jend  = nx - 1;
 
     // the interior grid points
+    #pragma omp parallel for collapse(2)
     for (int j=1; j < jend; j++) {
         for (int i=1; i < iend; i++) {
             //TODO
             // f(i,j) = ...
-
+            f(i, j) = -(4.0 + alpha) * s_new(i, j)
+                  + s_new(i + 1, j) + s_new(i - 1, j)
+                  + s_new(i, j + 1) + s_new(i, j - 1)
+                  + alpha * s_old(i, j)
+                  + beta * s_new(i, j) * (1.0 - s_new(i, j));
         }
     }
 
     // east boundary
     {
         int i = nx - 1;
+        #pragma omp parallel for
         for (int j = 1; j < jend; j++) {
             f(i,j) = -(4. + alpha) * s_new(i,j)
                    + s_new(i-1,j) + bndE[j]
@@ -57,6 +63,7 @@ void diffusion(data::Field const& s_old, data::Field const& s_new,
     // west boundary
     {
         int i = 0;
+        #pragma omp parallel for
         for (int j = 1; j < jend; j++) {
             f(i,j) = -(4. + alpha) * s_new(i,j)
                    + bndW[j]      + s_new(i+1,j)
@@ -67,10 +74,11 @@ void diffusion(data::Field const& s_old, data::Field const& s_new,
     }
 
     // north boundary (plus NE and NW corners)
+    #pragma omp parallel sections
     {
-        int j = nx - 1;
-
+        #pragma omp section
         {
+            int j = nx - 1;
             int i = 0; // NW corner
             f(i,j) = -(4. + alpha) * s_new(i,j)
                    + bndW[j]      + s_new(i+1,j)
@@ -79,16 +87,21 @@ void diffusion(data::Field const& s_old, data::Field const& s_new,
                    + beta * s_new(i,j) * (1.0 - s_new(i,j));
         }
 
-        // north boundary
-        for (int i = 1; i < iend; i++) {
-            f(i,j) = -(4. + alpha) * s_new(i,j)
-                   + s_new(i-1,j) + s_new(i+1,j)
-                   + s_new(i,j-1) + bndN[i]
-                   + alpha * s_old(i,j)
-                   + beta * s_new(i,j) * (1.0 - s_new(i,j));
+        #pragma omp section
+        {
+            int j = nx - 1;
+            for (int i = 1; i < iend; i++) {
+                f(i,j) = -(4. + alpha) * s_new(i,j)
+                       + s_new(i-1,j) + s_new(i+1,j)
+                       + s_new(i,j-1) + bndN[i]
+                       + alpha * s_old(i,j)
+                       + beta * s_new(i,j) * (1.0 - s_new(i,j));
+            }
         }
 
+        #pragma omp section
         {
+            int j = nx - 1;
             int i = nx - 1; // NE corner
             f(i,j) = -(4. + alpha) * s_new(i,j)
                    + s_new(i-1,j) + bndE[j]
@@ -99,10 +112,11 @@ void diffusion(data::Field const& s_old, data::Field const& s_new,
     }
 
     // south boundary (plus SW and SE corners)
+    #pragma omp parallel sections
     {
-        int j = 0;
-
+        #pragma omp section
         {
+            int j = 0;
             int i = 0; // SW corner
             f(i,j) = -(4. + alpha) * s_new(i,j)
                    + bndW[j] + s_new(i+1,j)
@@ -111,16 +125,21 @@ void diffusion(data::Field const& s_old, data::Field const& s_new,
                    + beta * s_new(i,j) * (1.0 - s_new(i,j));
         }
 
-        // south boundary
-        for (int i = 1; i < iend; i++) {
-            f(i,j) = -(4. + alpha) * s_new(i,j)
-                   + s_new(i-1,j) + s_new(i+1,j)
-                   + bndS[i]      + s_new(i,j+1)
-                   + alpha * s_old(i,j)
-                   + beta * s_new(i,j) * (1.0 - s_new(i,j));
+        #pragma omp section
+        {
+            int j = 0;
+            for (int i = 1; i < iend; i++) {
+                f(i,j) = -(4. + alpha) * s_new(i,j)
+                       + s_new(i-1,j) + s_new(i+1,j)
+                       + bndS[i]      + s_new(i,j+1)
+                       + alpha * s_old(i,j)
+                       + beta * s_new(i,j) * (1.0 - s_new(i,j));
+            }
         }
 
+        #pragma omp section
         {
+            int j = 0;
             int i = nx - 1; // SE corner
             f(i,j) = -(4. + alpha) * s_new(i,j)
                    + s_new(i-1,j) + bndE[j]

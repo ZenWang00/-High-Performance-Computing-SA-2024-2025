@@ -86,6 +86,13 @@ class Field {
     int length() const { return xdim_*ydim_; }
 
     private:
+    // set to a constant value
+    void fill(double val) {
+        #pragma omp parallel for
+        for(int i=0; i<xdim_*ydim_; ++i) {
+            ptr_[i] = val;
+        }
+    }
 
     void free() {
         if(ptr_) delete[] ptr_;

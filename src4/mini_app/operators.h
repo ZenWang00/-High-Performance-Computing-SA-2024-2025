@@ -8,7 +8,7 @@
 
 #ifndef OPERATORS_H
 #define OPERATORS_H
-
+#include <omp.h>
 #include "data.h"
 
 namespace operators {
