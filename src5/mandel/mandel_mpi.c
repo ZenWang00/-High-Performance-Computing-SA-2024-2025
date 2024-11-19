@@ -139,6 +139,7 @@ int main(int argc, char** argv) {
 			Domain d1 = createDomain(p1);
 
 			// TODO: receive partition of the process proc into array c (overwrite its data)
+
 			MPI_Recv(c, d1.nx * d1.ny, MPI_INT, proc, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
 
 			// write the partition of the process proc
