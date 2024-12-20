@@ -59,15 +59,28 @@ int main(int argc, char* argv[]) {
   }
 
   // Partition work evenly among processes
-  int nrows_local = n;
-  int row_beg_local = 0;
-  int row_end_local = row_beg_local + nrows_local - 1;
-  printf("[Proc %3d] Doing rows %d to %d\n", rank, row_beg_local,
-         row_end_local);
   // To do: Partition the "n" rows of the matrix evenly among the "size" MPI
   //        processes.
   // Hint : The first "n % size" processes get "n / size + 1" rows, while the
   //        remaining processes get "n / size".
+
+
+  int nrows_base = n / size;       // Base number of rows per process
+  int remainder = n % size;        // Extra rows to distribute
+  int nrows_local;
+  int row_beg_local;
+  int row_end_local;
+
+  if (rank < remainder) {
+    nrows_local = nrows_base + 1;
+    row_beg_local = rank * nrows_local;
+  } else {
+    nrows_local = nrows_base;
+    row_beg_local = rank * nrows_base + remainder;
+  }
+  row_end_local = row_beg_local + nrows_local - 1;
+
+  printf("[Proc %3d] Doing rows %d to %d\n", rank, row_beg_local, row_end_local);
 
   // Initialize matrix A
   double* A = (double*) calloc(nrows_local*n, sizeof(double));
@@ -130,51 +143,77 @@ int main(int argc, char* argv[]) {
   }
   // To do: Broadcast the random initial guess vector to all MPI processes.
   // Hint : MPI_Bcast.
+  MPI_Bcast(y, n, MPI_DOUBLE, 0, MPI_COMM_WORLD);
 
+  // Prepare for MPI_Allgatherv
+  int* recvcounts = (int*)malloc(size * sizeof(int));
+  int* displs = (int*)malloc(size * sizeof(int));
+
+  for (int i = 0; i < size; ++i) {
+    if (i < remainder) {
+      recvcounts[i] = nrows_base + 1;
+      displs[i] = i * recvcounts[i];
+    } else {
+      recvcounts[i] = nrows_base;
+      displs[i] = i * nrows_base + remainder;
+    }
+  }
   // Power method
   double theta, error;
   double* y_local = (double*) calloc(nrows_local, sizeof(double));
   double* v       = (double*) calloc(n, sizeof(double));
   int iter;
+  
   double time_start = walltime();
   for (iter = 0; iter < niter; ++iter) {
-    // To do: Implement parallel power method here.
-    // Hint : Do the matrix-vector multiply y = A v below over the local
-    //        (to the process) rows, and use MPI_Allgather / MPI_Allgatherv
-    //        to synchronize the result.
-    // Normalize vector: v = y / || y ||_2
-    double norm2 = 0.;
-    for (int i_global = 0; i_global < n; ++i_global) {
-      norm2 += y[i_global]*y[i_global];
-    }
-    double norm = sqrt(norm2);
-    for (int i_global = 0; i_global < n; ++i_global) {
-      v[i_global] = y[i_global] / norm;
-    }
-    // Matrix-vector multiply: y = A v
-    // Hint: Compute only the local rows, save them in the buffer y_local
-    //       and synchronize the result using MPI_Allgather / MPI_Allgatherv.
+    // Matrix-vector multiply: y_local = A_local * v
     for (int i_local = 0; i_local < nrows_local; ++i_local) {
-      y[i_local] = 0.;
+      y_local[i_local] = 0.0;
       for (int j_global = 0; j_global < n; ++j_global) {
-        y[i_local] += A[i_local*n + j_global]*v[j_global];
+        y_local[i_local] += A[i_local * n + j_global] * y[j_global];
       }
     }
-    // Compute eigenvalue: theta = v^T y
-    theta = 0.;
-    for (int i_global = 0; i_global < n; ++i_global) {
-      theta += v[i_global]*y[i_global];
+
+    // Allgatherv to gather y_local into y
+    MPI_Allgatherv(y_local, nrows_local, MPI_DOUBLE,
+                   y, recvcounts, displs, MPI_DOUBLE, MPI_COMM_WORLD);
+
+    // Compute theta = v^T * y
+    double local_theta = 0.0;
+    for (int i_local = 0; i_local < nrows_local; ++i_local) {
+      int i_global = row_beg_local + i_local;
+      local_theta += y[i_global] * y[i_global];
     }
-    // Check convergence
-    double error2 = 0.;
+    MPI_Allreduce(&local_theta, &theta, 1, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
+    theta = sqrt(theta);
+
+    // Normalize vector: v = y / || y ||_2
     for (int i_global = 0; i_global < n; ++i_global) {
-      error2 += (y[i_global] - theta*v[i_global])
-              *(y[i_global] - theta*v[i_global]);
+      v[i_global] = y[i_global] / theta;
     }
+
+    // Compute error: || y - theta * v ||
+    double local_error2 = 0.0;
+    for (int i_local = 0; i_local < nrows_local; ++i_local) {
+      int i_global = row_beg_local + i_local;
+      double diff = y_local[i_local] - theta * v[i_global];
+      local_error2 += diff * diff;
+    }
+    double error2;
+    MPI_Allreduce(&local_error2, &error2, 1, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
     error = sqrt(error2);
-    if (rank == 0) printf("iteration / theta/ error: %4d / %15.5f / %25.15e\n",
-                          iter, theta, error);
-    if (error < tol*fabs(theta)) break;
+
+    if (rank == 0)
+      printf("iteration / theta/ error: %4d / %15.5f / %25.15e\n",
+             iter, theta, error);
+
+    if (error < tol * fabs(theta))
+      break;
+
+    // Update y for next iteration
+    for (int i_global = 0; i_global < n; ++i_global) {
+      y[i_global] = v[i_global];
+    }
   }
   double time_end = walltime();
 
@@ -198,6 +237,8 @@ int main(int argc, char* argv[]) {
   free(y);
   free(y_local);
   free(v);
+  free(recvcounts);
+  free(displs);
 
   // Finalize MPI
   MPI_Finalize();

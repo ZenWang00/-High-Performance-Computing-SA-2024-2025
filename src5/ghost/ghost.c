@@ -12,7 +12,7 @@
  * Contents: C-Source                                           *
  *                                                              *
  ****************************************************************/
-　
+
 /* Use only 16 processes for this exercise
  * Send the ghost cell in two directions: left<->right and top<->bottom
  * ranks are connected in a cyclic manner, for instance, rank 0 and 12 are connected
@@ -77,7 +77,6 @@ int main(int argc, char *argv[])
     for (i=0; i<DOMAINSIZE*DOMAINSIZE; i++) {
         data[i]=rank;
     }
-
     // TODO: set the dimensions of the processor grid and periodic boundaries in both dimensions
     dims[0]= 4;
     dims[1]= 4;
@@ -89,64 +88,85 @@ int main(int argc, char *argv[])
     // ranks in all dimensions in a cyclic manner.
     MPI_Cart_create(MPI_COMM_WORLD, 2, dims, periods, 0, &comm_cart);
     
+    
     // TODO: find your top/bottom/left/right neighbor using the new communicator, see MPI_Cart_shift()
     // rank_top, rank_bottom
     // rank_left, rank_right
     MPI_Cart_shift(comm_cart, 0, 1, &rank_top, &rank_bottom);
     MPI_Cart_shift(comm_cart, 1, 1, &rank_left, &rank_right);
-
+    //part:1 start
     //  TODO: create derived datatype data_ghost, create a datatype for sending the column, see MPI_Type_vector() and MPI_Type_commit()
     // data_ghost
     MPI_Type_vector(SUBDOMAIN, 1, DOMAINSIZE, MPI_DOUBLE, &data_ghost);
     MPI_Type_commit(&data_ghost);
 
     //  TODO: ghost cell exchange with the neighbouring cells in all directions
-    //  use MPI_Irecv(), MPI_Send(), MPI_Wait() or other viable alternatives
-    MPI_Irecv(&data[0], DOMAINSIZE, MPI_DOUBLE, rank_top, 0, comm_cart, &request[0]);
-    MPI_Send(&data[DOMAINSIZE], DOMAINSIZE, MPI_DOUBLE, rank_bottom, 0, comm_cart);
+    // part2
+    MPI_Irecv(&data[1], DOMAINSIZE - 2, MPI_DOUBLE, rank_top, 0, comm_cart, &request);
+    MPI_Send(&data[DOMAINSIZE + 1], DOMAINSIZE - 2, MPI_DOUBLE, rank_bottom, 0, comm_cart);
+    MPI_Wait(&request, &status);
 
-    // to the bottom
-    MPI_Irecv(&data[DOMAINSIZE * (DOMAINSIZE - 1)], DOMAINSIZE, MPI_DOUBLE, rank_bottom, 1, comm_cart, &request[1]);    
-    MPI_Send(&data[DOMAINSIZE * (DOMAINSIZE - 2)], DOMAINSIZE, MPI_DOUBLE, rank_top, 1, comm_cart);
+    // // to the bottom
+    MPI_Irecv(&data[DOMAINSIZE * (DOMAINSIZE - 1) + 1], DOMAINSIZE - 2, MPI_DOUBLE, rank_bottom, 1, comm_cart, &request);
+    MPI_Send(&data[DOMAINSIZE * (DOMAINSIZE - 2) + 1], DOMAINSIZE - 2, MPI_DOUBLE, rank_top, 1, comm_cart);
+    MPI_Wait(&request, &status);
 
-    // to the left
-    MPI_Irecv(&data[1], 1, data_ghost, rank_left, 2, comm_cart, &request[2]);
-    MPI_Send(&data[2], 1, data_ghost, rank_right, 2, comm_cart);
+    MPI_Datatype data_ghost_column;
+    MPI_Type_vector(SUBDOMAIN, 1, DOMAINSIZE, MPI_DOUBLE, &data_ghost_column);
+    MPI_Type_commit(&data_ghost_column);
 
-    // to the right
-    MPI_Irecv(&data[DOMAINSIZE - 1], 1, data_ghost, rank_right, 3, comm_cart, &request[3]);
-    MPI_Send(&data[DOMAINSIZE - 2], 1, data_ghost, rank_left, 3, comm_cart);
-    MPI_Waitall(8, request, status);
+    // // to the left
+    MPI_Irecv(&data[DOMAINSIZE], 1, data_ghost_column, rank_left, 2, comm_cart, &request);
+    MPI_Send(&data[DOMAINSIZE + 1], 1, data_ghost_column, rank_right, 2, comm_cart);
+    MPI_Wait(&request, &status);
+
+    // // to the right
+    MPI_Irecv(&data[2 * DOMAINSIZE - 1], 1, data_ghost_column, rank_right, 3, comm_cart, &request);
+    MPI_Send(&data[2 * DOMAINSIZE - 2], 1, data_ghost_column, rank_left, 3, comm_cart);
+    MPI_Wait(&request, &status);    
+
 
     //Bonus [10 Points]: Also exchange ghost values with the neighbors in ordinal directions (northeast, southeast, southwest and northwest).
-    int rank_northwest, rank_northeast, rank_southwest, rank_southeast;
+    int coords[2]; 
+    int coords_nw[2], coords_ne[2], coords_sw[2], coords_se[2];
+    int rank_northwest, rank_northeast, rank_southwest, rank_southeast; 
 
-    // obtaining the rank from the neighbors in ordinal directions 
-    // northwest
-    // MPI_Cart_shift(comm_cart, 0, -1, &rank_top, NULL);   
-    // MPI_Cart_shift(comm_cart, 1, -1, &rank_left, NULL);  
-    // rank_northwest = rank_top != MPI_PROC_NULL && rank_left != MPI_PROC_NULL ? rank_left : MPI_PROC_NULL;
-    // northeast
-    // MPI_Cart_shift(comm_cart, 0, -1, &rank_top, NULL);   
-    // MPI_Cart_shift(comm_cart, 1, 1, &rank_right, NULL);  
-    // rank_northeast = rank_top != MPI_PROC_NULL && rank_right != MPI_PROC_NULL ? rank_right : MPI_PROC_NULL;
-    // southwest
-    // MPI_Cart_shift(comm_cart, 0, 1, &rank_bottom, NULL); 
-    // MPI_Cart_shift(comm_cart, 1, -1, &rank_left, NULL);  
-    // rank_southwest = rank_bottom != MPI_PROC_NULL && rank_left != MPI_PROC_NULL ? rank_left : MPI_PROC_NULL;
-    // southeast
-    // MPI_Cart_shift(comm_cart, 0, 1, &rank_bottom, NULL); 
-    // MPI_Cart_shift(comm_cart, 1, 1, &rank_right, NULL);  
-    // rank_southeast = rank_bottom != MPI_PROC_NULL && rank_right != MPI_PROC_NULL ? rank_right : MPI_PROC_NULL;
-    // of different directions
-    // MPI_Irecv(&data[0], 1, MPI_DOUBLE, rank_northwest, 4, comm_cart, &request[4]);
-    // MPI_Send(&data[DOMAINSIZE + 1], 1, MPI_DOUBLE, rank_southeast, 4, comm_cart);
-    // MPI_Irecv(&data[DOMAINSIZE - 1], 1, MPI_DOUBLE, rank_northeast, 5, comm_cart, &request[5]);
-    // MPI_Send(&data[2 * DOMAINSIZE - 2], 1, MPI_DOUBLE, rank_southwest, 5, comm_cart);
-    // MPI_Irecv(&data[(DOMAINSIZE - 1) * DOMAINSIZE], 1, MPI_DOUBLE, rank_southwest, 6, comm_cart, &request[6]);
-    // MPI_Send(&data[(DOMAINSIZE - 2) * DOMAINSIZE + 1], 1, MPI_DOUBLE, rank_northeast, 6, comm_cart);
-    // MPI_Irecv(&data[DOMAINSIZE * DOMAINSIZE - 1], 1, MPI_DOUBLE, rank_southeast, 7, comm_cart, &request[7]);
-    // MPI_Send(&data[(DOMAINSIZE - 2) * DOMAINSIZE - 2], 1, MPI_DOUBLE, rank_northwest, 7, comm_cart);
+    MPI_Cart_coords(comm_cart, rank, 2, coords);
+
+    coords_nw[0] = (coords[0] - 1 + dims[0]) % dims[0];
+    coords_nw[1] = (coords[1] - 1 + dims[1]) % dims[1];
+    MPI_Cart_rank(comm_cart, coords_nw, &rank_northwest);
+
+    coords_ne[0] = (coords[0] - 1 + dims[0]) % dims[0];
+    coords_ne[1] = (coords[1] + 1) % dims[1];
+    MPI_Cart_rank(comm_cart, coords_ne, &rank_northeast);
+
+    coords_sw[0] = (coords[0] + 1) % dims[0];
+    coords_sw[1] = (coords[1] - 1 + dims[1]) % dims[1];
+    MPI_Cart_rank(comm_cart, coords_sw, &rank_southwest);
+
+    coords_se[0] = (coords[0] + 1) % dims[0];
+    coords_se[1] = (coords[1] + 1) % dims[1];
+    MPI_Cart_rank(comm_cart, coords_se, &rank_southeast);
+
+
+    MPI_Sendrecv(&data[DOMAINSIZE + 1], 1, MPI_DOUBLE, rank_southeast, 4,
+                &data[0], 1, MPI_DOUBLE, rank_northwest, 4,
+                comm_cart, &status);
+
+    MPI_Sendrecv(&data[DOMAINSIZE + DOMAINSIZE -2], 1, MPI_DOUBLE, rank_southwest, 5,
+                &data[DOMAINSIZE -1], 1, MPI_DOUBLE, rank_northeast, 5,
+                comm_cart, &status);
+
+    MPI_Sendrecv(&data[(DOMAINSIZE -2) * DOMAINSIZE +1], 1, MPI_DOUBLE, rank_northeast, 6,
+                &data[DOMAINSIZE * (DOMAINSIZE -1)], 1, MPI_DOUBLE, rank_southwest, 6,
+                comm_cart, &status);
+
+
+    MPI_Sendrecv(&data[(DOMAINSIZE -2) * DOMAINSIZE + DOMAINSIZE -2], 1, MPI_DOUBLE, rank_northwest, 7,
+                &data[DOMAINSIZE * DOMAINSIZE -1], 1, MPI_DOUBLE, rank_southeast, 7,
+                comm_cart, &status);
+    //part2
 
     if (rank==9) {
         printf("data of rank 9 after communication\n");
