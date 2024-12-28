@@ -62,6 +62,7 @@ PetscErrorCode ComputeRHS(KSP ksp, Vec b, void *ctx) {
   DMDALocalInfo  info;                       // Local grid information
   PetscScalar  **array;                      // Local portion of vector array
   PetscReal      hx, hy;                     // Grid spacing in x and y directions
+  PetscInt       i, j;
 
   PetscFunctionBeginUser;
 
@@ -78,6 +79,15 @@ PetscErrorCode ComputeRHS(KSP ksp, Vec b, void *ctx) {
 
   // TODO 
   // Loop over the local grid points
+  for (j = info.ys; j < info.ys + info.ym; j++) {
+    for (i = info.xs; i < info.xs + info.xm; i++) {
+      if (i == 0 || j == 0 || i == info.mx - 1 || j == info.my - 1) {
+        array[j][i] = 0.0;  // u = 0 on boundaries
+      } else {
+        array[j][i] = user->c;  // RHS = constant source term
+      }
+    }
+  }
   // Set the values of the RHS based on boundary and interior
   //! Note "info" contains everything you need ... see (https://petsc.org/release/manualpages/DMDA/DMDAGetInfo/)
 
@@ -92,60 +102,55 @@ PetscErrorCode ComputeRHS(KSP ksp, Vec b, void *ctx) {
 PetscErrorCode ComputeMatrix(KSP ksp, Mat A, Mat P, void *ctx) {
   DM            da;
   DMDALocalInfo info;
-  PetscReal     hx, hy, hx2, hy2;
+  PetscReal     hx, hy, hxd, hyd, hxhyd;
   MatStencil    row, col[5];
+  PetscInt      i, j;
+  PetscScalar   v[5];
 
   PetscFunctionBeginUser;
-
-  //! <DEBUG >Get the MPI rank for debug printing (remove this code for full test)
-  //PetscMPIInt   rank;
-  //PetscCallMPI(MPI_Comm_rank(PETSC_COMM_WORLD, &rank));
-  //! <DEBUG >Get the MPI rank for debug printing (remove this code for full test)
 
   // Retrieve the distributed array, grid information, and global grid dimensions
   PetscCall(KSPGetDM(ksp, &da));
   PetscCall(DMDAGetLocalInfo(da, &info)); // info.mx and info.my include boundary points
-  
+  hx = 1.0 / (PetscReal)(info.mx - 1);
+  hy = 1.0 / (PetscReal)(info.my - 1);
+  hxd = hx * hx;
+  hyd = hy * hy;
+  hxhyd = 2.0 / hxd + 2.0 / hyd;
+
   // TODO 
   // Loop over the local grid points
   // Set the values of the matrix based on 5 point Stencil 
   //! Note "info" contains everything you need ... see (https://petsc.org/release/manualpages/DMDA/DMDAGetInfo/)
-  // > LOOP OVER GRID (i)
-    // > LOOP OVER GRID (j)
-      
-      //! <DEBUG> Print the global index and rank (remove this code for full test)
-      //PetscCall(PetscSynchronizedPrintf(PETSC_COMM_WORLD, "Rank %d: Global index (i, j) = (%d, %d)\n", rank, i, j));
-      //! <DEBUG> Print the global index and rank (remove this code for full test)
 
-      // Boundary points: Apply Dirichlet boundary condition (u = 0)
+  // For boundary points, we enforce Dirichlet conditions: u = 0 at boundaries
+  // This means the row in the matrix should be: A_{ii} = 1 and no other non-zero values.
+  // For interior points, we use the standard 5-point stencil:
+  //   A_{ij,ij} = - (2/hx^2 + 2/hy^2)
+  //   A_{ij,i±1j} = 1/hx^2
+  //   A_{ij,ij±1} = 1/hy^2
+  
+  for (j = info.ys; j < info.ys + info.ym; j++) {
+    for (i = info.xs; i < info.xs + info.xm; i++) {
 
-      // Bottom: S_{i,j-1}
-      PetscScalar v_bottom = 1
-      
-      // Left: S_{i-1,j}
-      PetscScalar v_left   = 1
-      
-      // Center: S_{i,j}
-      PetscScalar v_center = 1
-      
-      // Right: S_{i+1,j}
-      PetscScalar v_right = 1
-      
-      // Top: S_{i,j+1}
-      PetscScalar v_top = 1
-      // Add the finite difference stencil values to the matrix
-      
-      // Create Stencil: 
-      PetscScalar v[5] = {v_bottom, v_left, v_center, v_right, v_top};
-      
-      // Create Matrix Stencil:
-      PetscCall(MatSetValuesStencil(A, 1, &row, 5, col, v, ADD_VALUES));
+      row.i = i; row.j = j;
+
+      if (i == 0 || j == 0 || i == info.mx - 1 || j == info.my - 1) {
+        // Boundary point: Dirichlet condition
+        v[0] = 1.0;
+        PetscCall(MatSetValuesStencil(A, 1, &row, 1, &row, v, INSERT_VALUES));
+      } else {
+        // Interior point: 5-point stencil
+        v[0] = 1.0 / hyd;     col[0].i = i;     col[0].j = j - 1; // Bottom
+        v[1] = 1.0 / hxd;     col[1].i = i - 1; col[1].j = j;     // Left
+        v[2] = -hxhyd;        col[2].i = i;     col[2].j = j;     // Center
+        v[3] = 1.0 / hxd;     col[3].i = i + 1; col[3].j = j;     // Right
+        v[4] = 1.0 / hyd;     col[4].i = i;     col[4].j = j + 1; // Top
+
+        PetscCall(MatSetValuesStencil(A, 1, &row, 5, col, v, INSERT_VALUES));
+      }
+    }
   }
-
-  //! <DEBUG> Ensure all processes print their debug output (remove this code for full test)
-  //PetscCall(PetscSynchronizedPrintf(PETSC_COMM_WORLD, "==============\n"));
-  //PetscCall(PetscSynchronizedFlush(PETSC_COMM_WORLD, PETSC_STDOUT));
-  //! <DEBUG> Ensure all processes print their debug output (remove this code for full test)
 
   // Assemble the matrix after all values have been set
   PetscCall(MatAssemblyBegin(A, MAT_FINAL_ASSEMBLY));

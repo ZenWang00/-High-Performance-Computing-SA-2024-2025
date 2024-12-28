@@ -37,7 +37,8 @@ def ComputeRHS(nx, ny, f_value):
 
     # TODO Gernate RHS vector
     # Note .flatten() By default we have "row-major" ordering!
-    return []
+    rhs = np.full((nx * ny,), f_value)
+    return rhs
 
 def ComputeMatrix(nx, ny, dx, dy):
 
@@ -48,6 +49,17 @@ def ComputeMatrix(nx, ny, dx, dy):
     N = nx * ny    
 
     # TODO: Loop over grid points (i, j) and compute the entries of matrix A as a sparse matrix by populating row_indices, col_indices, and data.
+    for j in range(ny):
+        for i in range(nx):
+            index = j * nx + i
+            if i == 0 or j == 0 or i == nx - 1 or j == ny - 1:
+                row_indices.append(index)
+                col_indices.append(index)
+                data.append(1)
+            else:
+                row_indices.extend([index, index, index, index, index])
+                col_indices.extend([index, index + 1, index - 1, index + nx, index - nx])
+                data.extend([-4, 1, 1, 1, 1])
 
     return csr_matrix((data, (row_indices, col_indices)), shape=(N, N))
 
